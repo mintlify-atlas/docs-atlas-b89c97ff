@@ -1,0 +1,73 @@
+{
+  "projectType": "saas",
+  "projectName": "Go Payment Dashboard",
+  "projectDescription": "A full-stack payment dashboard built with Go (chi, PostgreSQL) backend and a React/TypeScript frontend, deployable via Docker Compose or Fly.io.",
+  "theme": "palm",
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Architecture",
+            "pages": ["architecture/overview", "architecture/backend", "architecture/frontend", "architecture/database"]
+          },
+          {
+            "group": "Configuration",
+            "pages": ["configuration/environment-variables", "configuration/cors", "configuration/docker"]
+          },
+          {
+            "group": "Deployment",
+            "pages": ["deployment/fly-io", "deployment/github-actions"]
+          },
+          {
+            "group": "Development",
+            "pages": ["development/local-setup", "development/testing"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["api-reference/overview"]
+          },
+          {
+            "group": "Payments",
+            "pages": ["api-reference/payments/list", "api-reference/payments/get", "api-reference/payments/create"]
+          },
+          {
+            "group": "Health",
+            "pages": ["api-reference/health/health", "api-reference/health/db-health"]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Go REST API with chi router and PostgreSQL (pgx/sqlc)",
+    "React 19 + TypeScript frontend with Tailwind CSS and shadcn/ui",
+    "Payment CRUD — list, get by ID, and create payments",
+    "Docker Compose for local development with live-reload (Air)",
+    "Automated deployment to Fly.io via GitHub Actions",
+    "Semantic releases with goreleaser and semantic-release",
+    "Integration tests using Testcontainers for PostgreSQL",
+    "CORS configuration for frontend/backend separation"
+  ],
+  "publicApiSurface": [
+    "GET /payments — list all payments",
+    "GET /payments/{id} — get payment by ID",
+    "POST /payments — create a new payment",
+    "GET /health — application health check",
+    "GET /health/db — database health check",
+    "GET / — hello world endpoint"
+  ]
+}
