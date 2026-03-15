@@ -1,0 +1,143 @@
+---
+title: "Deploy to Fly.io"
+description: "Deploy the Go Payment Dashboard backend and frontend as two separate Fly.io apps."
+---
+
+The Go Payment Dashboard ships as two independent Fly.io applications — a Go backend and a React frontend — each with its own `fly.toml` configuration file. The live demo runs at [go-dashboard.fly.dev](https://go-dashboard.fly.dev).
+
+## Prerequisites
+
+<Columns cols={2}>
+  <Card title="flyctl" icon="terminal" href="https://fly.io/docs/hands-on/install-flyctl/">
+    The Fly.io CLI. Install it with the one-liner on the Fly.io docs, then verify with `flyctl version`.
+  </Card>
+  <Card title="Fly.io account" icon="user" href="https://fly.io/app/sign-up">
+    A free Fly.io account. The hobby plan is sufficient for both apps.
+  </Card>
+</Columns>
+
+## App structure
+
+The repository contains two Fly.io configuration files:
+
+| File | App | Description |
+|---|---|---|
+| `fly.backend.toml` | Backend | Go REST API, built from the root `Dockerfile` |
+| `fly.toml` | Frontend | React dashboard, served as a static build |
+
+<Note>
+  Both apps must be deployed for the dashboard to function. The backend must be deployed and accessible before the frontend can reach the API.
+</Note>
+
+## Deploy manually
+
+<Steps>
+  <Step title="Install flyctl">
+    ```bash
+    curl -L https://fly.io/install.sh | sh
+    ```
+
+    Verify the installation:
+
+    ```bash
+    flyctl version
+    ```
+  </Step>
+
+  <Step title="Log in to Fly.io">
+    ```bash
+    fly auth login
+    ```
+
+    This opens your browser to authenticate. Once complete, `flyctl` stores credentials locally.
+  </Step>
+
+  <Step title="Create the backend app">
+    From the repository root, launch the backend app. Fly.io reads `fly.backend.toml` for the app name and region.
+
+    ```bash
+    fly launch --config fly.backend.toml
+    ```
+
+    <Tip>
+      If you already ran `fly launch` before, use `flyctl deploy --config fly.backend.toml` instead to deploy without re-configuring.
+    </Tip>
+  </Step>
+
+  <Step title="Create the frontend app">
+    Launch the frontend app using the default `fly.toml`:
+
+    ```bash
+    fly launch
+    ```
+  </Step>
+
+  <Step title="Set secrets on the backend app">
+    The backend reads database credentials and the allowed CORS origin from environment secrets. Set them before deploying:
+
+    ```bash
+    fly secrets set \
+      DB_HOST=your-db-host \
+      DB_PORT=5432 \
+      DB_DATABASE=dashboard \
+      DB_USERNAME=postgres \
+      DB_PASSWORD=your-db-password \
+      DB_SCHEMA=public \
+      DB_SSLMODE=require \
+      FRONTEND_ORIGIN=https://your-frontend-app.fly.dev \
+      --config fly.backend.toml
+    ```
+
+    <Warning>
+      `FRONTEND_ORIGIN` must exactly match the URL your browser uses to reach the frontend — including the scheme (`https://`) and no trailing slash. A mismatch will cause CORS errors.
+    </Warning>
+
+    See [Environment variables](/configuration/environment-variables) for the full list of supported variables.
+  </Step>
+
+  <Step title="Deploy the backend">
+    ```bash
+    flyctl deploy --config fly.backend.toml
+    ```
+
+    Fly.io builds the Docker image from the root `Dockerfile` and deploys it to your backend app.
+  </Step>
+
+  <Step title="Deploy the frontend">
+    ```bash
+    flyctl deploy
+    ```
+
+    This deploys the frontend app using `fly.toml`.
+  </Step>
+</Steps>
+
+## CI/CD with GitHub Actions
+
+Both apps are deployed automatically on every push to `main` via the `fly-deploy.yml` workflow. The workflow requires a `FLY_API_TOKEN` secret in your GitHub repository settings.
+
+To generate a token:
+
+```bash
+fly tokens create deploy
+```
+
+Add the token to your repository under **Settings → Secrets and variables → Actions** as `FLY_API_TOKEN`.
+
+See [GitHub Actions](/deployment/github-actions) for the full workflow details.
+
+## Verify the deployment
+
+Once both apps are running, check the backend health endpoint:
+
+```bash
+curl https://your-backend-app.fly.dev/health
+```
+
+A successful response:
+
+```json
+{ "status": "ok" }
+```
+
+Then open your frontend URL in a browser. The live demo is available at [https://go-dashboard.fly.dev](https://go-dashboard.fly.dev).

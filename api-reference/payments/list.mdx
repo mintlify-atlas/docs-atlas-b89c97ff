@@ -1,0 +1,88 @@
+---
+title: 'List payments'
+description: 'Retrieve a list of all payment records.'
+---
+
+Returns an array of all payments stored in the database, ordered by creation time.
+
+## Endpoint
+
+```
+GET /payments
+```
+
+## Parameters
+
+This endpoint takes no parameters.
+
+## Response
+
+Returns an array of payment objects. Returns an empty array `[]` when no payments exist.
+
+<ResponseField name="id" type="number" required>
+  Unique integer identifier for the payment.
+</ResponseField>
+
+<ResponseField name="sender" type="string" required>
+  The name or identifier of the party sending the payment.
+</ResponseField>
+
+<ResponseField name="recipient" type="string" required>
+  The name or identifier of the party receiving the payment.
+</ResponseField>
+
+<ResponseField name="amount" type="number" required>
+  The payment amount as a floating-point number.
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string" required>
+  ISO 8601 timestamp of when the payment was last updated.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string" required>
+  ISO 8601 timestamp of when the payment was created.
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request GET \
+  --url https://go-dashboard.fly.dev/payments
+```
+
+```json Response
+[
+  {
+    "id": 1,
+    "sender": "alice",
+    "recipient": "bob",
+    "amount": 150.00,
+    "updatedAt": "2026-03-15T09:30:00Z",
+    "createdAt": "2026-03-15T09:30:00Z"
+  },
+  {
+    "id": 2,
+    "sender": "carol",
+    "recipient": "dave",
+    "amount": 75.50,
+    "updatedAt": "2026-03-15T10:00:00Z",
+    "createdAt": "2026-03-15T10:00:00Z"
+  }
+]
+```
+
+</CodeGroup>
+
+## Errors
+
+| Status | Condition |
+| ------ | --------- |
+| `500` | Database query failed |
+
+```json 500 response
+{
+  "error": "failed to retrieve payments"
+}
+```

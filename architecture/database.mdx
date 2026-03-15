@@ -1,0 +1,181 @@
+---
+title: Database architecture
+description: PostgreSQL schema, sqlc workflow, pgx/v5 connection pooling, DB_SSLMODE configuration, and the three payment queries.
+---
+
+The application uses PostgreSQL as its database. Schema migrations are applied by running SQL files directly. Queries are written in plain SQL, then compiled to type-safe Go by sqlc.
+
+## Schema
+
+The `payments` table is defined in `sql/migration/payment.sql`. Apply it once when setting up the database.
+
+```sql
+CREATE TABLE payments (
+    id         SERIAL PRIMARY KEY,
+    sender     VARCHAR(255)   NOT NULL,
+    recipient  VARCHAR(255)   NOT NULL,
+    amount     DECIMAL(10, 2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+```
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `SERIAL` | Auto-incrementing primary key |
+| `sender` | `VARCHAR(255)` | Name or identifier of the payment sender |
+| `recipient` | `VARCHAR(255)` | Name or identifier of the payment recipient |
+| `amount` | `DECIMAL(10, 2)` | Monetary value with two decimal places |
+| `created_at` | `TIMESTAMP` | Set automatically on insert |
+| `updated_at` | `TIMESTAMP` | Set automatically on insert; update manually on change |
+
+<Note>
+Migrations are applied manually by running the SQL file against the target database. There is no migration framework — the file is the source of truth for the schema.
+</Note>
+
+## sqlc workflow
+
+sqlc generates type-safe Go code from SQL query files. The generated code lives in `internal/generated/sqlc/` and is imported by the infrastructure repositories in `internal/infrastructure/db/`.
+
+<Steps>
+  <Step title="Write SQL queries">
+    Each query in `sql/query/payment.sql` is annotated with a `-- name:` comment that specifies the generated function name and return type (`:one`, `:many`, or `:exec`).
+
+    ```sql
+    -- name: GetPaymentByID :one
+    SELECT * FROM payments WHERE id = $1 LIMIT 1;
+
+    -- name: GetPayments :many
+    SELECT * FROM payments ORDER BY created_at DESC;
+
+    -- name: CreatePayment :one
+    INSERT INTO payments (sender, recipient, amount)
+    VALUES ($1, $2, $3) RETURNING *;
+    ```
+  </Step>
+  <Step title="Run sqlc generate">
+    sqlc reads the query annotations and the schema, then emits Go source files with fully typed function signatures and parameter structs.
+
+    ```bash
+    sqlc generate
+    ```
+  </Step>
+  <Step title="Use generated code in repositories">
+    Infrastructure repositories call the generated functions. No manual row scanning or type assertions are needed.
+
+    ```go
+    // internal/infrastructure/db/payment_repository.go
+    payment, err := s.queries.GetPaymentByID(ctx, id)
+    payments, err := s.queries.GetPayments(ctx)
+    created, err := s.queries.CreatePayment(ctx, generated.CreatePaymentParams{
+        Sender:    params.Sender,
+        Recipient: params.Recipient,
+        Amount:    params.Amount,
+    })
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+Commit the generated files in `internal/generated/sqlc/` to version control. This makes the generated types available to all team members without requiring sqlc to be installed in every environment.
+</Tip>
+
+## Query reference
+
+The three queries used by the application:
+
+<AccordionGroup>
+  <Accordion title="GetPaymentByID" defaultOpen={false}>
+    Returns a single payment row matching the given ID. Used by `GET /payments/{id}`.
+
+    ```sql
+    -- name: GetPaymentByID :one
+    SELECT * FROM payments WHERE id = $1 LIMIT 1;
+    ```
+
+    sqlc generates a Go function with the signature:
+
+    ```go
+    func (q *Queries) GetPaymentByID(ctx context.Context, id int32) (Payment, error)
+    ```
+  </Accordion>
+  <Accordion title="GetPayments" defaultOpen={false}>
+    Returns all payment rows ordered by `created_at` descending (newest first). Used by `GET /payments`.
+
+    ```sql
+    -- name: GetPayments :many
+    SELECT * FROM payments ORDER BY created_at DESC;
+    ```
+
+    sqlc generates a Go function with the signature:
+
+    ```go
+    func (q *Queries) GetPayments(ctx context.Context) ([]Payment, error)
+    ```
+  </Accordion>
+  <Accordion title="CreatePayment" defaultOpen={false}>
+    Inserts a new payment row with the provided `sender`, `recipient`, and `amount`, then returns the complete inserted row including the auto-generated `id` and timestamps. Used by `POST /payments`.
+
+    ```sql
+    -- name: CreatePayment :one
+    INSERT INTO payments (sender, recipient, amount)
+    VALUES ($1, $2, $3) RETURNING *;
+    ```
+
+    sqlc generates a Go function with the signature:
+
+    ```go
+    func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
+    ```
+
+    Where `CreatePaymentParams` is:
+
+    ```go
+    type CreatePaymentParams struct {
+        Sender    string
+        Recipient string
+        Amount    pgtype.Numeric
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Connection pooling with pgx/v5
+
+The application connects to PostgreSQL using `pgx/v5` with `pgxpool` for connection pooling. A pool keeps a set of idle connections open, reducing the latency of acquiring a connection on each request.
+
+```go
+import (
+    "github.com/jackc/pgx/v5/pgxpool"
+)
+
+pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
+if err != nil {
+    log.Fatalf("unable to connect to database: %v", err)
+}
+defer pool.Close()
+```
+
+The `DATABASE_URL` environment variable uses the standard PostgreSQL connection string format:
+
+```bash
+DATABASE_URL=postgres://user:password@localhost:5432/payments_db
+```
+
+## SSL configuration
+
+The connection's SSL mode is controlled by the `DB_SSLMODE` environment variable, which is appended to the connection string.
+
+| Value | When to use |
+|---|---|
+| `disable` | Local development with a database running on localhost |
+| `require` | Production environments where the connection must be encrypted |
+| `verify-full` | Production with strict certificate validation against a known CA |
+
+<Warning>
+Do not use `sslmode=disable` in production. All connections to a remote PostgreSQL instance should use at minimum `require`.
+</Warning>
+
+## Health check
+
+The server exposes `GET /health/db`, which pings the database pool and returns a `200 OK` if the database is reachable or a `503 Service Unavailable` if it is not. This is registered in `internal/server/routes.go` alongside the application routes.

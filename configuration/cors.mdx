@@ -1,0 +1,71 @@
+---
+title: 'CORS configuration'
+description: 'Cross-Origin Resource Sharing settings for the Go Payment Dashboard API.'
+---
+
+The backend uses the [go-chi/cors](https://github.com/go-chi/cors) middleware, registered globally on the router in `internal/server/routes.go`.
+
+```go internal/server/routes.go
+r.Use(cors.Handler(cors.Options{
+    AllowedOrigins:   []string{os.Getenv("FRONTEND_ORIGIN")},
+    AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+    AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+    AllowCredentials: true,
+    MaxAge:           300,
+}))
+```
+
+## Configuration reference
+
+| Option | Value | Description |
+|--------|-------|-------------|
+| `AllowedOrigins` | `[FRONTEND_ORIGIN]` | Origins permitted to make cross-origin requests. Driven by the `FRONTEND_ORIGIN` environment variable. |
+| `AllowedMethods` | `GET, POST, PUT, DELETE, OPTIONS, PATCH` | HTTP methods the browser is allowed to use. |
+| `AllowedHeaders` | `Accept, Authorization, Content-Type` | Request headers the browser may send. |
+| `AllowCredentials` | `true` | Allows cookies and `Authorization` headers to be included in cross-origin requests. |
+| `MaxAge` | `300` seconds | How long the browser caches the preflight response before sending another `OPTIONS` request. |
+
+## How it works
+
+On every request the middleware checks whether the `Origin` header matches an entry in `AllowedOrigins`. When a match is found, the appropriate `Access-Control-*` response headers are added. For non-simple requests (e.g. requests with `Authorization` headers), the browser first sends a preflight `OPTIONS` request; the `MaxAge` of 300 seconds reduces how frequently these preflight requests are repeated.
+
+`AllowCredentials: true` is required whenever the frontend sends cookies or an `Authorization` header. This setting prevents the use of a wildcard (`*`) origin — every allowed origin must be listed explicitly.
+
+## Local development
+
+Set `FRONTEND_ORIGIN` to the Vite dev server origin in your `.env` file:
+
+```bash .env
+FRONTEND_ORIGIN=http://localhost:5173
+```
+
+The frontend Vite dev server runs on port `5173` by default (see `compose.yml`).
+
+## Production
+
+Set `FRONTEND_ORIGIN` to the exact URL your frontend is served from, including the scheme and any non-standard port:
+
+```bash
+FRONTEND_ORIGIN=https://your-app.fly.dev
+```
+
+<Warning>
+  Do not use a wildcard origin (`*`) in production when `AllowCredentials` is `true`. The CORS specification forbids this combination, and the browser will block the request. Always supply the exact frontend origin.
+</Warning>
+
+<Note>
+  If your deployment puts the frontend and backend on the same origin, CORS restrictions no longer apply and this middleware has no effect on same-origin requests.
+</Note>
+
+## Adding additional origins
+
+To allow multiple origins (for example, a staging environment alongside production), extend the `AllowedOrigins` slice:
+
+```go internal/server/routes.go
+AllowedOrigins: []string{
+    os.Getenv("FRONTEND_ORIGIN"),
+    "https://staging.your-app.fly.dev",
+},
+```
+
+Alternatively, manage multiple origins through a comma-separated environment variable and parse it at startup.

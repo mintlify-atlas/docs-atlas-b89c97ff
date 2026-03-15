@@ -1,0 +1,94 @@
+---
+title: Testing
+description: Run unit tests, API tests, and database integration tests for the Go Payment Dashboard.
+---
+
+The project has two test suites: API-level unit tests that run without any external dependencies, and database integration tests that use [Testcontainers](https://testcontainers.com) to spin up a real PostgreSQL instance.
+
+<Columns cols={2}>
+  <Card title="Unit & API tests" icon="flask" href="/development/testing#unit-and-api-tests">
+    Run anywhere. No Docker required. Covers API handlers in `internal/api/`.
+  </Card>
+  <Card title="Integration tests" icon="database" href="/development/testing#integration-tests">
+    Require Docker. Spin up a real PostgreSQL container to test actual database operations.
+  </Card>
+</Columns>
+
+## Unit and API tests
+
+Run all tests across the entire project:
+
+```bash
+go test ./... -v
+```
+
+This includes the API-level tests in `internal/api/payment_test.go`. These tests do not require Docker or a running database — they can be run in any environment.
+
+<Tip>
+  Run this command before pushing a branch. It's the same command the CI workflow (`go-test.yml`) runs on pull requests.
+</Tip>
+
+## Integration tests
+
+Integration tests live in `internal/database` and test actual database operations against a real PostgreSQL instance.
+
+```bash
+go test ./internal/database -v
+```
+
+<Warning>
+  Docker must be running before executing integration tests. Testcontainers starts a temporary PostgreSQL container automatically for the test run and tears it down afterward.
+</Warning>
+
+The integration tests cover:
+
+- `GetPayments` — retrieve a list of payments
+- `GetPaymentByID` — look up a single payment by ID
+- `CreatePayment` — insert a new payment record
+
+## Test tooling
+
+The project uses two testing libraries:
+
+| Library | Purpose |
+|---|---|
+| `github.com/stretchr/testify v1.11.1` | Assertions (`assert`, `require`) |
+| `github.com/testcontainers/testcontainers-go v0.40.0` | Spin up Docker containers in tests |
+| `github.com/testcontainers/testcontainers-go/modules/postgres v0.40.0` | PostgreSQL-specific Testcontainers module |
+
+## Writing new tests
+
+<Steps>
+  <Step title="Choose the right package">
+    Place API handler tests alongside the handler code in `internal/api/`. Place database query tests in `internal/database/`.
+  </Step>
+  <Step title="Use testify for assertions">
+    Import `github.com/stretchr/testify/assert` for non-fatal checks and `github.com/stretchr/testify/require` for assertions that should stop the test immediately on failure.
+
+    ```go
+    import (
+        "testing"
+
+        "github.com/stretchr/testify/assert"
+        "github.com/stretchr/testify/require"
+    )
+
+    func TestCreatePayment(t *testing.T) {
+        payment, err := db.CreatePayment(ctx, params)
+        require.NoError(t, err)
+        assert.Equal(t, params.Amount, payment.Amount)
+    }
+    ```
+  </Step>
+  <Step title="Use Testcontainers for database tests">
+    If your test requires a database, use the existing Testcontainers setup in `internal/database` as a reference. The PostgreSQL container is started once per test run and shared across tests in the package.
+  </Step>
+</Steps>
+
+## CI
+
+The `go-test.yml` GitHub Actions workflow runs `go test ./... -v` automatically on every pull request. Integration tests that require Docker also run in CI because GitHub-hosted runners have Docker available.
+
+<Info>
+  If a test passes locally but fails in CI, check whether the test depends on local environment variables or a specific `.env` file that isn't present in the CI environment.
+</Info>

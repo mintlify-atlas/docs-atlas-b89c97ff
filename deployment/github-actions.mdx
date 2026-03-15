@@ -1,0 +1,128 @@
+---
+title: "GitHub Actions"
+description: "CI/CD pipelines for testing, deploying to Fly.io, and publishing releases."
+---
+
+The repository ships with three GitHub Actions workflows that handle automated testing, deployment, and versioned releases.
+
+## Workflows overview
+
+<Columns cols={3}>
+  <Card title="go-test.yml" icon="flask">
+    Runs the Go test suite on every pull request.
+  </Card>
+  <Card title="fly-deploy.yml" icon="rocket">
+    Deploys both Fly.io apps on every push to `main`.
+  </Card>
+  <Card title="release.yml" icon="tag">
+    Creates semantic versioned releases using semantic-release and GoReleaser.
+  </Card>
+</Columns>
+
+## go-test.yml — pull request tests
+
+Every pull request triggers the test workflow, which runs the full Go test suite against the backend:
+
+```bash
+go test ./... -v
+```
+
+This runs all unit and integration tests in the repository and prints verbose output so failures are easy to diagnose in the Actions log.
+
+<Tip>
+  Run the same command locally before opening a PR to catch failures early. See [Testing](/development/testing) for more details.
+</Tip>
+
+## fly-deploy.yml — deploy to Fly.io
+
+The deploy workflow triggers on every push to the `main` branch and deploys the backend and frontend in sequence.
+
+```yaml .github/workflows/fly-deploy.yml
+name: Fly Deploy
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy app
+    runs-on: ubuntu-latest
+    concurrency: deploy-group
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # Deploy backend
+      - run: flyctl deploy --config fly.backend.toml
+      # Deploy frontend
+      - run: flyctl deploy
+```
+
+### How it works
+
+- **Trigger**: any push to the `main` branch.
+- **Concurrency group**: the `deploy-group` concurrency key ensures that if a second push lands while a deploy is in progress, the in-progress run completes before the next one starts. This prevents race conditions between overlapping deployments.
+- **Backend first**: `flyctl deploy --config fly.backend.toml` deploys the Go API using the backend Fly.io configuration.
+- **Frontend second**: `flyctl deploy` deploys the React frontend using the default `fly.toml`.
+
+### Setting up the FLY_API_TOKEN secret
+
+The workflow authenticates with Fly.io using a deploy token stored as a GitHub secret.
+
+<Steps>
+  <Step title="Generate a Fly.io deploy token">
+    ```bash
+    fly tokens create deploy
+    ```
+
+    Copy the token from the output.
+  </Step>
+
+  <Step title="Add the secret to your GitHub repository">
+    In your repository, go to **Settings → Secrets and variables → Actions** and click **New repository secret**.
+
+    - **Name**: `FLY_API_TOKEN`
+    - **Value**: the token you copied
+
+    Click **Add secret**.
+  </Step>
+
+  <Step title="Verify the workflow runs">
+    Push a commit to `main` (or re-run the workflow manually from the **Actions** tab) and confirm both deploy steps complete successfully.
+  </Step>
+</Steps>
+
+<Warning>
+  Never commit the `FLY_API_TOKEN` value to your repository. Always store it as a GitHub Actions secret.
+</Warning>
+
+## release.yml — semantic versioning releases
+
+The release workflow uses [semantic-release](https://semantic-release.gitbook.io/semantic-release/) (configured in `.releaserc.json`) to determine the next version from conventional commit messages, then invokes [GoReleaser](https://goreleaser.com/) (configured in `.goreleaser.yml`) to build and publish binary artifacts.
+
+### How versioning works
+
+Commit message prefixes control the version bump:
+
+| Prefix | Version bump | Example |
+|---|---|---|
+| `fix:` | Patch (1.0.**1**) | `fix: handle null payment ID` |
+| `feat:` | Minor (1.**1**.0) | `feat: add CSV export endpoint` |
+| `feat!:` or `BREAKING CHANGE` | Major (**2**.0.0) | `feat!: remove v1 payments API` |
+
+### GoReleaser
+
+When semantic-release determines a new version is needed, GoReleaser builds cross-platform binaries and attaches them as release assets on the GitHub release. The `.goreleaser.yml` file in the repository root controls which platforms are targeted and how artifacts are named.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Deploy to Fly.io" icon="rocket" href="/deployment/fly-io">
+    Manual deployment steps and Fly.io app configuration.
+  </Card>
+  <Card title="Testing" icon="flask" href="/development/testing">
+    Run the Go test suite locally before pushing.
+  </Card>
+</CardGroup>

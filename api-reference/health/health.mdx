@@ -1,0 +1,49 @@
+---
+title: 'Application health'
+description: 'Check that the application server is running and accepting requests.'
+---
+
+Returns a simple status message confirming the application process is running. Use this endpoint for load balancer health checks and uptime monitoring.
+
+## Endpoint
+
+```
+GET /health
+```
+
+## Parameters
+
+This endpoint takes no parameters.
+
+## Response
+
+<ResponseField name="message" type="string" required>
+  A fixed status string. Always returns `"App is running"` when the server is healthy.
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```bash cURL
+curl --request GET \
+  --url https://go-dashboard.fly.dev/health
+```
+
+```json Response
+{
+  "message": "App is running"
+}
+```
+
+</CodeGroup>
+
+## Use cases
+
+- **Load balancer health checks** — configure your load balancer to poll this endpoint and route traffic only to instances that return `200`.
+- **Uptime monitoring** — use a monitoring service (e.g., UptimeRobot, Pingdom) to alert on non-`200` responses.
+- **Container readiness probes** — use as a Kubernetes readiness probe to gate traffic until the process is up.
+
+<Note>
+  This endpoint only confirms the HTTP server is accepting connections. It does not verify database connectivity. Use [GET /health/db](/api-reference/health/db-health) to check the database.
+</Note>

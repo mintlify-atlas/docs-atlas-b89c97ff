@@ -1,0 +1,85 @@
+---
+title: 'API reference'
+description: 'Complete reference for the Go Payment Dashboard REST API.'
+---
+
+The Go Payment Dashboard API is a JSON REST API for managing payment records. No authentication is required — this is a demo application.
+
+## Base URL
+
+<CodeGroup>
+
+```bash Production
+https://go-dashboard.fly.dev
+```
+
+```bash Local development
+http://localhost:8080
+```
+
+</CodeGroup>
+
+<Info>
+  When running locally, replace `8080` with the value of your `PORT` environment variable if you have configured a different port.
+</Info>
+
+## Endpoints
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/health` | Check application health |
+| `GET` | `/health/db` | Check database connectivity |
+| `GET` | `/payments` | List all payments |
+| `GET` | `/payments/{id}` | Get a payment by ID |
+| `POST` | `/payments` | Create a new payment |
+
+## Request format
+
+All request bodies must be JSON. Set the `Content-Type` header to `application/json` on requests that include a body.
+
+```bash
+curl --request POST \
+  --url https://go-dashboard.fly.dev/payments \
+  --header 'Content-Type: application/json' \
+  --data '{"sender": "alice", "recipient": "bob", "amount": 50.00}'
+```
+
+## Response format
+
+All responses return JSON. Successful responses return the requested resource or a status message directly.
+
+```json
+{
+  "id": 1,
+  "sender": "alice",
+  "recipient": "bob",
+  "amount": 50.00,
+  "updatedAt": "2026-03-15T10:00:00Z",
+  "createdAt": "2026-03-15T10:00:00Z"
+}
+```
+
+## Error format
+
+All errors return a JSON object with an `error` field describing what went wrong.
+
+```json
+{
+  "error": "description of what went wrong"
+}
+```
+
+## HTTP status codes
+
+| Code | Meaning |
+| ---- | ------- |
+| `200` | Success |
+| `400` | Bad request — invalid input or malformed JSON |
+| `404` | Not found — the requested resource does not exist |
+| `500` | Internal server error — database or server failure |
+
+## Authentication
+
+<Note>
+  This API does not require authentication. It is a demo application intended for learning and development purposes.
+</Note>

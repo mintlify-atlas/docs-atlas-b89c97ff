@@ -1,0 +1,138 @@
+---
+title: Local setup
+description: Set up the Go Payment Dashboard for local development using Docker Compose or running the backend and frontend manually.
+---
+
+## Prerequisites
+
+Before you begin, make sure you have the following installed:
+
+<Columns cols={3}>
+  <Card title="Docker" icon="docker">
+    Required for the recommended Docker Compose workflow and for running integration tests.
+  </Card>
+  <Card title="Go 1.25+" icon="code">
+    Required if running the backend outside of Docker.
+  </Card>
+  <Card title="Node.js" icon="node-js">
+    Required if running the Vite frontend outside of Docker.
+  </Card>
+</Columns>
+
+## Environment variables
+
+Both the backend and frontend require a `.env` file before you can start the project.
+
+<Steps>
+  <Step title="Create the root .env file">
+    Create a `.env` file in the project root directory. The backend uses `github.com/joho/godotenv` to load this file at startup.
+
+    ```bash
+    touch .env
+    ```
+  </Step>
+  <Step title="Create the frontend .env file">
+    Create a second `.env` file inside the `frontend/` directory.
+
+    ```bash
+    touch frontend/.env
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  The application will not start correctly if either `.env` file is missing. Make sure both files exist before running any start commands, even if they are empty.
+</Warning>
+
+## Running the project
+
+There are two ways to run the project locally: with Docker Compose (recommended) or manually.
+
+### Option 1: Docker Compose (recommended)
+
+Docker Compose starts both the backend and frontend in a single command.
+
+```bash
+docker compose up
+```
+
+What happens when you run this:
+
+- **Backend**: The `cosmtrek/air` service starts and watches Go source files. When you save a `.go` file, Air automatically recompiles and restarts the server — no manual restarts needed. The live-reload behavior is configured in `.air.toml`.
+- **Frontend**: The `node:25-alpine` service runs `npm install` on first start, then launches the Vite dev server on port `5173`.
+
+<Tip>
+  On first run, Docker pulls the required images and installs frontend dependencies. Subsequent starts are faster because the node_modules layer is cached.
+</Tip>
+
+**Other useful Docker Compose commands:**
+
+<CodeGroup>
+
+```bash Stop services
+docker compose down
+```
+
+```bash View logs
+docker compose logs -f
+```
+
+```bash Restart a specific service
+docker compose restart backend
+```
+
+</CodeGroup>
+
+### Option 2: Run manually
+
+If you prefer to run the backend and frontend as separate processes without Docker:
+
+**Backend**
+
+```bash
+go run ./cmd/api/...
+```
+
+For live reloading without Docker, install [Air](https://github.com/cosmtrek/air) and run:
+
+```bash
+air
+```
+
+Air reads its configuration from `.air.toml` in the project root.
+
+**Frontend**
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+The Vite dev server starts on port `5173`. Additional frontend commands:
+
+<CodeGroup>
+
+```bash TypeScript check + production build
+npm run build
+```
+
+```bash Run ESLint
+npm run lint
+```
+
+</CodeGroup>
+
+## Code generation
+
+The project uses [sqlc](https://sqlc.dev) to generate type-safe Go code from SQL queries. The generated files live in `internal/generated/sqlc/`.
+
+After modifying any SQL files in `sql/query/`, regenerate the Go code:
+
+```bash
+sqlc generate
+```
+
+This reads `sqlc.yaml` and regenerates the contents of `internal/generated/sqlc/` based on your updated queries.
+
+<Note>
+  Commit the generated files alongside your SQL changes. Other contributors and CI rely on the generated code being present in the repository.
+</Note>

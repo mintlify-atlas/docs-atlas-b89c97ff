@@ -1,0 +1,145 @@
+---
+title: 'Environment variables'
+description: 'Configure the Go Payment Dashboard backend and frontend using environment variables.'
+---
+
+The application uses [godotenv](https://github.com/joho/godotenv) to automatically load a `.env` file from the project root at startup. Copy `.env.example` to `.env` and fill in the values before running locally.
+
+```bash
+cp .env.example .env
+```
+
+## Backend variables
+
+These variables are read by the Go server at runtime.
+
+<AccordionGroup>
+  <Accordion title="PORT" defaultOpen={false}>
+    The port the HTTP server listens on.
+
+    | Field | Value |
+    |-------|-------|
+    | Required | Yes |
+    | Example | `8080` |
+  </Accordion>
+
+  <Accordion title="APP_ENV">
+    The application environment. Controls behaviour such as logging verbosity.
+
+    | Field | Value |
+    |-------|-------|
+    | Required | Yes |
+    | Example | `development` or `production` |
+  </Accordion>
+
+  <Accordion title="DB_HOST">
+    Hostname or IP address of the PostgreSQL server.
+
+    | Field | Value |
+    |-------|-------|
+    | Required | Yes |
+    | Example | `localhost` |
+  </Accordion>
+
+  <Accordion title="DB_PORT">
+    Port the PostgreSQL server listens on.
+
+    | Field | Value |
+    |-------|-------|
+    | Required | Yes |
+    | Example | `5432` |
+  </Accordion>
+
+  <Accordion title="DB_DATABASE">
+    Name of the PostgreSQL database.
+
+    | Field | Value |
+    |-------|-------|
+    | Required | Yes |
+    | Example | `payment_dashboard` |
+  </Accordion>
+
+  <Accordion title="DB_USERNAME">
+    PostgreSQL user that the application connects as.
+
+    | Field | Value |
+    |-------|-------|
+    | Required | Yes |
+    | Example | `postgres` |
+  </Accordion>
+
+  <Accordion title="DB_PASSWORD">
+    Password for the PostgreSQL user.
+
+    | Field | Value |
+    |-------|-------|
+    | Required | Yes |
+    | Example | `supersecret` |
+  </Accordion>
+
+  <Accordion title="DB_SCHEMA">
+    PostgreSQL schema to use within the database.
+
+    | Field | Value |
+    |-------|-------|
+    | Required | Yes |
+    | Example | `public` |
+  </Accordion>
+
+  <Accordion title="DB_SSLMODE">
+    SSL mode for the PostgreSQL connection. Use `disable` for local development and `require` or `verify-full` in production.
+
+    | Field | Value |
+    |-------|-------|
+    | Required | Yes |
+    | Example | `disable` |
+  </Accordion>
+
+  <Accordion title="FRONTEND_ORIGIN">
+    The origin URL of the frontend application. Used by the CORS middleware to set `Access-Control-Allow-Origin`. Must exactly match the scheme, hostname, and port that the browser sends.
+
+    | Field | Value |
+    |-------|-------|
+    | Required | Yes |
+    | Example | `http://localhost:5173` |
+
+    See [CORS configuration](/configuration/cors) for full details.
+  </Accordion>
+</AccordionGroup>
+
+## Frontend variables
+
+The Vite frontend reads environment variables from `frontend/.env` (development) or `frontend/.env.production` (production builds). Vite only exposes variables prefixed with `VITE_` to the browser bundle.
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `VITE_API_URL` | Base URL of the Go backend API. Used by the frontend to make HTTP requests. | `http://localhost:8080` |
+
+<Note>
+  The production value of `VITE_API_URL` in `frontend/.env.production` points to the Fly.io backend URL. Update this value if you deploy to a different host.
+</Note>
+
+## Local development example
+
+A complete `.env` file for running the stack locally with Docker Compose:
+
+```bash .env
+PORT=8080
+APP_ENV=development
+DB_HOST=db
+DB_PORT=5432
+DB_DATABASE=payment_dashboard
+DB_USERNAME=postgres
+DB_PASSWORD=supersecret
+DB_SCHEMA=public
+DB_SSLMODE=disable
+FRONTEND_ORIGIN=http://localhost:5173
+```
+
+<Tip>
+  When running with Docker Compose, set `DB_HOST` to the name of your database service (e.g. `db`), not `localhost`. The Go app container resolves hostnames using the `go_dashboard` Docker network.
+</Tip>
+
+<Warning>
+  Never commit your `.env` file to version control. It is listed in `.gitignore` by default. Use `.env.example` to document required variables without real values.
+</Warning>

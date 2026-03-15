@@ -1,0 +1,162 @@
+---
+title: 'Docker'
+description: 'Run the Go Payment Dashboard locally with Docker Compose and build production images.'
+---
+
+The project ships with a `compose.yml` for local development and a `Dockerfile` for production builds.
+
+## Services overview
+
+`compose.yml` defines two services that communicate over a shared Docker network named `go_dashboard`.
+
+<Columns cols={2}>
+  <Card title="app" icon="server">
+    The Go backend. Uses the `cosmtrek/air` image for live-reload on file changes.
+  </Card>
+  <Card title="frontend" icon="monitor">
+    The Vite frontend. Uses the official `node:25-alpine` image and runs `npm install && npm run dev` on startup.
+  </Card>
+</Columns>
+
+## Running locally
+
+<Steps>
+  <Step title="Create your .env file">
+    Copy the example env file and fill in the required values:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    See [Environment variables](/configuration/environment-variables) for a full reference.
+  </Step>
+
+  <Step title="Start the stack">
+    ```bash
+    docker compose up
+    ```
+
+    The backend is available at `http://localhost:${PORT}` and the frontend at `http://localhost:5173`.
+  </Step>
+
+  <Step title="Stop the stack">
+    ```bash
+    docker compose down
+    ```
+  </Step>
+</Steps>
+
+## Service details
+
+### app (Go backend)
+
+```yaml compose.yml
+app:
+  image: cosmtrek/air
+  working_dir: /dashboard
+  restart: unless-stopped
+  ports:
+    - ${PORT}:${PORT}
+  environment:
+    APP_ENV: ${APP_ENV}
+    PORT: ${PORT}
+    DB_HOST: ${DB_HOST}
+    DB_PORT: ${DB_PORT}
+    DB_DATABASE: ${DB_DATABASE}
+    DB_USERNAME: ${DB_USERNAME}
+    DB_PASSWORD: ${DB_PASSWORD}
+    DB_SCHEMA: ${DB_SCHEMA}
+    DB_SSLMODE: ${DB_SSLMODE}
+  volumes:
+    - ./cmd:/dashboard/cmd
+    - ./internal:/dashboard/internal
+    - ./go.mod:/dashboard/go.mod
+    - ./go.sum:/dashboard/go.sum
+    - ./.air.toml:/dashboard/.air.toml
+    - ./.env:/dashboard/.env
+  networks:
+    - go_dashboard
+```
+
+**Image:** `cosmtrek/air` — a lightweight Go live-reload tool. Air watches the mounted source files and rebuilds the binary automatically when you save a file.
+
+**Port mapping:** The host port and container port are both set from the `PORT` environment variable, so changing `PORT` in `.env` changes both sides simultaneously.
+
+**Volume mounts:**
+
+| Host path | Container path | Purpose |
+|-----------|---------------|---------|
+| `./cmd` | `/dashboard/cmd` | Application entry points |
+| `./internal` | `/dashboard/internal` | Business logic and handlers |
+| `./go.mod` | `/dashboard/go.mod` | Module definition |
+| `./go.sum` | `/dashboard/go.sum` | Dependency checksums |
+| `./.air.toml` | `/dashboard/.air.toml` | Air live-reload configuration |
+| `./.env` | `/dashboard/.env` | Runtime environment variables |
+
+**Environment variables:** All backend environment variables from `.env` are passed explicitly into the container. The `.env` file is also volume-mounted so `godotenv` can load it directly.
+
+### frontend (Vite dev server)
+
+```yaml compose.yml
+frontend:
+  image: node:25-alpine
+  restart: unless-stopped
+  working_dir: /frontend
+  volumes:
+    - ./frontend/:/frontend/
+    - /frontend/node_modules
+  depends_on:
+    - app
+  ports:
+    - 5173:5173
+  networks:
+    - go_dashboard
+  command: sh -c "npm install && npm install && npm run dev"
+```
+
+**Port mapping:** Port `5173` on the host maps to port `5173` in the container — the default Vite dev server port.
+
+**Node modules:** The `/frontend/node_modules` anonymous volume prevents the host `node_modules` directory (if any) from overriding the container's installed packages.
+
+**Startup command:** The container runs `npm install` followed by `npm run dev` every time it starts, ensuring dependencies are always up to date without requiring a local Node.js installation.
+
+**Depends on:** The frontend service waits for the `app` service to start before launching, reducing connection errors on initial startup.
+
+## Docker network
+
+Both services join the `go_dashboard` bridge network:
+
+```yaml compose.yml
+networks:
+  go_dashboard:
+```
+
+Service-to-service communication uses the service name as the hostname. For example, the frontend can reach the backend at `http://app:${PORT}` within the network.
+
+<Note>
+  When setting `DB_HOST` in your `.env` file for use with Docker Compose, use the name of your database service, not `localhost`. If you run PostgreSQL as a third service named `db`, set `DB_HOST=db`.
+</Note>
+
+## Production build
+
+The `Dockerfile` in the project root builds a production image of the Go backend. This image is used for [Fly.io deployment](/configuration/docker) (configured via `fly.toml` and `fly.backend.toml`).
+
+Build the image locally:
+
+```bash
+docker build -t payment-dashboard .
+```
+
+Run the production image:
+
+```bash
+docker run --env-file .env -p 8080:8080 payment-dashboard
+```
+
+## .dockerignore
+
+The `.dockerignore` file excludes files that should not be copied into the production image — such as the local `.env` file, development tooling, and generated build artefacts. This keeps the image small and prevents secrets from being baked into the image layer.
+
+<Warning>
+  Never add your `.env` file to the Docker image. Pass secrets to production containers using your platform's secret management (Fly.io secrets, environment variables injected at runtime, etc.).
+</Warning>

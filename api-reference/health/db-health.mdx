@@ -1,0 +1,71 @@
+---
+title: 'Database health'
+description: 'Check that the application can connect to and query the database.'
+---
+
+Returns detailed database health information. Use this endpoint to verify that the application has a working connection to its database backend.
+
+## Endpoint
+
+```
+GET /health/db
+```
+
+## Parameters
+
+This endpoint takes no parameters.
+
+## Response
+
+Returns a JSON object with database health status fields reported by the database driver. The exact shape of the response depends on the database configuration, but typically includes connection pool statistics and database version information.
+
+<ResponseField name="status" type="string">
+  Connection status, e.g. `"up"` or `"down"`.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable description of the database health status.
+</ResponseField>
+
+<ResponseField name="open_connections" type="number">
+  Number of currently open database connections.
+</ResponseField>
+
+<ResponseField name="in_use" type="number">
+  Number of connections currently in use by active queries.
+</ResponseField>
+
+<ResponseField name="idle" type="number">
+  Number of idle connections in the connection pool.
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```bash cURL
+curl --request GET \
+  --url https://go-dashboard.fly.dev/health/db
+```
+
+```json Response
+{
+  "status": "up",
+  "message": "It's healthy",
+  "open_connections": 3,
+  "in_use": 1,
+  "idle": 2
+}
+```
+
+</CodeGroup>
+
+## Use cases
+
+- **Database connectivity verification** — confirm the application can reach the database before running migrations or deployments.
+- **Connection pool monitoring** — track `open_connections`, `in_use`, and `idle` to detect pool exhaustion.
+- **Deployment readiness checks** — poll this endpoint after a deploy to confirm the new instance has established database connections.
+
+<Note>
+  If the database is unreachable, this endpoint may still return `200` with a status field indicating the failure, or it may return `500` depending on the severity of the connection error.
+</Note>

@@ -1,0 +1,47 @@
+---
+title: "Introduction"
+description: "A full-stack payment dashboard built with Go, React, and PostgreSQL — ready to run locally with Docker or deploy to Fly.io."
+---
+
+## What is Go Payment Dashboard?
+
+Go Payment Dashboard is an example full-stack application demonstrating best practices for building a production-ready web service. It features a Go REST API backend, a React/TypeScript frontend, and a PostgreSQL database — all wired together with Docker Compose for local development and GitHub Actions for automated deployment to Fly.io.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get the dashboard running locally in under five minutes.
+  </Card>
+  <Card title="Architecture" icon="diagram-project" href="/architecture/overview">
+    Understand how the backend, frontend, and database fit together.
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/overview">
+    Explore the REST API endpoints for managing payments.
+  </Card>
+  <Card title="Deployment" icon="cloud" href="/deployment/fly-io">
+    Deploy to Fly.io using the included GitHub Actions workflow.
+  </Card>
+</CardGroup>
+
+## Key features
+
+- **Go REST API** — Built with [chi](https://github.com/go-chi/chi) for routing and [pgx](https://github.com/jackc/pgx) + [sqlc](https://sqlc.dev/) for type-safe database access.
+- **React 19 frontend** — Vite, TypeScript, Tailwind CSS, shadcn/ui components, TanStack Query, and Recharts for data visualization.
+- **PostgreSQL database** — Schema managed with raw SQL migrations; queries generated via sqlc.
+- **Docker Compose** — Single command to run the entire stack locally with live-reload via [Air](https://github.com/air-verse/air).
+- **CI/CD pipeline** — Automated tests on pull requests and zero-downtime deployments to Fly.io on merge to `main`.
+- **Integration tests** — Database tests run against a real PostgreSQL instance spun up by [Testcontainers](https://testcontainers.com/).
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Go 1.25, chi v5, pgx v5, sqlc |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS v4 |
+| Database | PostgreSQL |
+| Local dev | Docker Compose, Air (live-reload) |
+| Deployment | Fly.io, GitHub Actions |
+| Testing | Go testing, Testcontainers |
+
+## Live demo
+
+The dashboard is deployed at [go-dashboard.fly.dev](https://go-dashboard.fly.dev).

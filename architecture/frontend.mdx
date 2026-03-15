@@ -1,0 +1,221 @@
+---
+title: Frontend architecture
+description: Vite + React 19 + TypeScript setup, feature-based folder structure, TanStack Query, TanStack Table, React Router v7, Zustand, shadcn/ui, Tailwind CSS v4, Recharts, and Axios.
+---
+
+The frontend is a React 19 single-page application written in TypeScript and bundled by Vite. It communicates with the Go backend over HTTP using Axios, with TanStack Query managing all server state.
+
+## Technology stack
+
+<Columns cols={2}>
+  <Card title="Build tooling" icon="zap">
+    **Vite** bundles the application with fast HMR in development. **TypeScript** provides static types across the entire codebase.
+  </Card>
+  <Card title="UI framework" icon="layout">
+    **React 19** with **shadcn/ui** components and **Tailwind CSS v4** for styling. **Lucide React** provides icons.
+  </Card>
+  <Card title="Server state" icon="refresh-cw">
+    **TanStack Query v5** handles all HTTP data fetching, caching, background revalidation, and loading/error states.
+  </Card>
+  <Card title="Client state" icon="layers">
+    **Zustand** manages local UI state that does not need to be synchronized with the server.
+  </Card>
+  <Card title="Routing" icon="map">
+    **React Router v7** handles client-side navigation and route definitions in `frontend/src/app/`.
+  </Card>
+  <Card title="Data visualization" icon="bar-chart">
+    **Recharts v2** renders payment charts and analytics using SVG-based React components.
+  </Card>
+</Columns>
+
+## Folder structure
+
+The project uses a feature-based layout. Each feature owns its own components, hooks, and types rather than scattering them across global directories.
+
+<Tree>
+  <Tree.Folder name="frontend/src" defaultOpen>
+    <Tree.Folder name="app" defaultOpen>
+      <Tree.File name="(router and app setup)" />
+    </Tree.Folder>
+    <Tree.Folder name="features" defaultOpen>
+      <Tree.Folder name="payments" defaultOpen>
+        <Tree.File name="(components, hooks, types for payments feature)" />
+      </Tree.Folder>
+    </Tree.Folder>
+    <Tree.Folder name="components">
+      <Tree.File name="(shared UI components)" />
+    </Tree.Folder>
+    <Tree.Folder name="hooks">
+      <Tree.File name="(shared custom React hooks)" />
+    </Tree.Folder>
+    <Tree.Folder name="types">
+      <Tree.File name="(shared TypeScript types)" />
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
+
+<Info>
+Feature-specific code lives under `features/payments/`. Only code that is used by more than one feature is promoted to the top-level `components/`, `hooks/`, or `types/` directories.
+</Info>
+
+## Server state with TanStack Query
+
+TanStack Query v5 is used for all data fetching. Each resource has a dedicated query or mutation hook inside `features/payments/`.
+
+```typescript
+// Example: fetching all payments
+import { useQuery } from '@tanstack/react-query'
+import axios from 'axios'
+import type { Payment } from '@/types'
+
+export function usePayments() {
+  return useQuery({
+    queryKey: ['payments'],
+    queryFn: async (): Promise<Payment[]> => {
+      const { data } = await axios.get('/payments')
+      return data
+    },
+  })
+}
+```
+
+```typescript
+// Example: creating a payment
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import axios from 'axios'
+
+export function useCreatePayment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { sender: string; recipient: string; amount: number }) =>
+      axios.post('/payments', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] })
+    },
+  })
+}
+```
+
+<Tip>
+Invalidating the `['payments']` query key on a successful mutation causes TanStack Query to re-fetch the list automatically, keeping the UI in sync without manual state updates.
+</Tip>
+
+## Payments table with TanStack Table
+
+The payments list uses **TanStack Table v8** (`@tanstack/react-table`) to handle column definitions, sorting, filtering, and pagination in a headless, type-safe way. The table component lives in `features/payments/` and renders using shadcn/ui `<Table>` primitives.
+
+```typescript
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from '@tanstack/react-table'
+import type { Payment } from '@/types'
+
+const columnHelper = createColumnHelper<Payment>()
+
+const columns = [
+  columnHelper.accessor('id', { header: 'ID' }),
+  columnHelper.accessor('sender', { header: 'Sender' }),
+  columnHelper.accessor('recipient', { header: 'Recipient' }),
+  columnHelper.accessor('amount', { header: 'Amount' }),
+  columnHelper.accessor('createdAt', { header: 'Created' }),
+]
+```
+
+## Routing with React Router v7
+
+Routes are defined in `frontend/src/app/`. React Router v7 uses a file-based or configuration-based approach to register routes and renders route components inside the application shell.
+
+```typescript
+import { createBrowserRouter } from 'react-router'
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <AppLayout />,
+    children: [
+      { index: true, element: <PaymentsPage /> },
+      { path: 'payments/:id', element: <PaymentDetailPage /> },
+    ],
+  },
+])
+```
+
+## Client state with Zustand
+
+Zustand manages local UI state that does not belong in the server cache — for example, modal open/close state, active filters, or selected rows.
+
+```typescript
+import { create } from 'zustand'
+
+interface PaymentUIStore {
+  selectedPaymentId: number | null
+  setSelectedPaymentId: (id: number | null) => void
+}
+
+export const usePaymentUIStore = create<PaymentUIStore>((set) => ({
+  selectedPaymentId: null,
+  setSelectedPaymentId: (id) => set({ selectedPaymentId: id }),
+}))
+```
+
+## Styling with shadcn/ui and Tailwind CSS v4
+
+shadcn/ui provides accessible, unstyled component primitives (buttons, inputs, dialogs, tables) that are copied directly into the project and styled with Tailwind utility classes. Tailwind CSS v4 uses a CSS-first configuration approach — the design tokens are defined in a CSS file rather than `tailwind.config.js`.
+
+## HTTP requests with Axios
+
+All HTTP requests to the Go backend use **Axios**. An Axios instance is configured with the backend base URL from an environment variable, allowing the same code to target `localhost:8080` in development and the production API in production.
+
+```typescript
+import axios from 'axios'
+
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+```
+
+## Data visualization with Recharts
+
+Recharts v2 renders charts within the payments feature — for example, a bar chart of payment volume over time. All Recharts components are React components that accept typed data arrays.
+
+```typescript
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+
+export function PaymentVolumeChart({ data }: { data: { date: string; total: number }[] }) {
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart data={data}>
+        <XAxis dataKey="date" />
+        <YAxis />
+        <Tooltip />
+        <Bar dataKey="total" />
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+```
+
+## Drag and drop
+
+**@dnd-kit** is available for drag-and-drop interactions, such as reordering dashboard panels or payment list rows. It provides a set of low-level, accessible primitives that integrate with React's event model.
+
+## Forms with TanStack Form
+
+The payment creation form uses **TanStack Form v1** (`@tanstack/react-form`) for field-level validation, submission handling, and TypeScript-safe field access.
+
+```typescript
+import { useForm } from '@tanstack/react-form'
+
+const form = useForm({
+  defaultValues: { sender: '', recipient: '', amount: 0 },
+  onSubmit: async ({ value }) => {
+    await createPayment.mutateAsync(value)
+  },
+})
+```
